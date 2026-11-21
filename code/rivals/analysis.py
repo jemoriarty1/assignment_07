@@ -36,8 +36,11 @@ def add_canonical(menus: pd.DataFrame, matches: pd.DataFrame) -> pd.DataFrame:
     that (`cafe`, `item`) — missing for items the owner has not reviewed yet.
     Every row of `menus` is kept, in order; `menus` itself is not changed.
     """
-    # TODO: your code here
-    pass
+    names = matches[["cafe", "item", "matched_to"]]
+    out = menus.merge(names, on=["cafe", "item"], how="left")
+    ours = out["cafe"] == OUR_CAFE
+    out["canonical"] = out["matched_to"].where(~ours, out["item"])
+    return out.drop(columns="matched_to")
 
 
 def price_table(menus: pd.DataFrame) -> pd.DataFrame:
