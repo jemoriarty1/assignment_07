@@ -99,8 +99,22 @@ def compare_prices(prices: pd.DataFrame) -> pd.DataFrame:
 
     Plain index.
     """
-    # TODO: your code here
-    pass
+
+    rivals = [cafe for cafe in prices.columns if cafe != OUR_CAFE]
+    rows = prices[prices[OUR_CAFE].notna() & prices[rivals].notna().any(axis=1)]
+    out = rows.rename(columns={OUR_CAFE: "our_price"}).reset_index()
+    out.columns.name = None
+    out = out[["canonical", "size", "our_price"] + rivals]
+    out["rival_avg"] = out[rivals].mean(axis=1).round(2)
+    lowest = out[rivals].min(axis=1)
+    highest = out[rivals].max(axis=1)
+    out["our_position"] = [
+        price_position(ours, low, average, high)
+        for ours, low, average, high in zip(
+            out["our_price"], lowest, out["rival_avg"], highest
+        )
+    ]
+    return out
 
 
 def gap_analysis(menus: pd.DataFrame) -> pd.DataFrame:
@@ -119,5 +133,25 @@ def gap_analysis(menus: pd.DataFrame) -> pd.DataFrame:
     Sorted by `where` ("only them" first, then "only us", then "both"), then
     `rivals` (most first), then `canonical`; plain index.
     """
-    # TODO: your code here
-    pass
+
+    known = menus.dropna(subset=["canonical"])
+    ours = known[known["cafe"] == OUR_CAFE][["canonical", "kind"]].drop_duplicates()
+    theirs = (
+        known[known["cafe"] != OUR_CAFE]
+        .groupby(["canonical", "kind"])["cafe"]
+        .agg(rivals="nunique", sold_by=lambda cafes: ", ".join(sorted(set(cafes))))
+        .reset_index()
+    )
+    out = pd.merge(ours, theirs, on=["canonical", "kind"], how="outer", indicator=True)
+    labels = {"left_only": "only us", "right_only": "only them", "both": "both"}
+    out["where"] = out["_merge"].astype(str).map(labels)
+    out["rivals"] = out["rivals"].fillna(0).astype(int)
+    out["sold_by"] = out["sold_by"].fillna("")
+    order = {"only them": 0, "only us": 1, "both": 2}
+    out["_order"] = out["where"].map(order)
+    out = out.sort_values(
+        ["_order", "rivals", "canonical"], ascending=[True, False, True]
+    )
+    return out[["canonical", "kind", "where", "rivals", "sold_by"]].reset_index(
+        drop=True
+    )
