@@ -32,6 +32,7 @@ def clean_price(text: str) -> float:
 
     return float(text.replace("$", "").replace(",", "").strip())
 
+
 def clean_card_lines(text: str) -> list[str]:
     """The useful lines of a menu card, in order, with the decoration removed."""
 
